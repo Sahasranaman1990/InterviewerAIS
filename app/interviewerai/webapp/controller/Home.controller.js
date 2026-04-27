@@ -90,15 +90,18 @@ this.recognition.onresult = (event) => {
 speakText: function (text) {
 
   // 🔥 Extract only question
-  let clean = text.split("Next:")[1] || text;
+  // 🔥 Prevent long AI monologue
+let clean = text.split("Next:")[1] || text;
 
-  clean = clean.trim();
+  clean = this._cleanTextForSpeech(clean);
+
+  this._browserSpeak(clean);
 
   // 🎯 Use Eleven only for short text
   // if (clean.length < 120) {
   //   this._speakWithEleven(clean);
   // } else {
-    this._browserSpeak(clean);
+    // this._browserSpeak(clean);
   // }
 },
 
@@ -164,12 +167,27 @@ _browserSpeak: function (text) {
     this._startListening();
   };
 },
+
+_cleanTextForSpeech: function (text) {
+
+  return text
+    .replace(/\*\*HR:\*\*/gi, "")
+    .replace(/\*\*Candidate:\*\*/gi, "")
+    .replace(/\*\*/g, "")
+    .replace(/😊|🙂|😀|😄|😃/g, "") // remove emojis
+    .replace(/:\)/g, "") // remove smiley text
+    .trim();
+},
 _startListening: function () {
   setTimeout(() => {
     if (this.recognition) {
-      this.recognition.start();
+      try {
+        this.recognition.start();
+      } catch (e) {
+        console.log("Mic restart prevented overlap");
+      }
     }
-  }, 250);
+  }, 800); // 🔥 more natural gap
 },
     // ▶ Start Interview
     onStartInterview: async function () {
@@ -214,24 +232,42 @@ _startListening: function () {
 
     // 🧠 Handle Answer
 _handleAnswer: async function (userInput) {
+  
 
   const oModel = this.getView().getModel();
   const chatModel = this.getView().getModel("chat");
 
   try {
 
-    // ✅ STEP 1: Count check BEFORE API call
-    let count = chatModel.getProperty("/count") || 0;
+  let count = chatModel.getProperty("/count") || 0;
 
-    if (count >= 8) {
-      this.speakText("Great, I think we have enough. Let's wrap up.");
+// 🔥 Detect repeat / rephrase
+const text = userInput.toLowerCase();
 
-      this.onFinishInterview(); // triggers evaluation
-      return;
-    }
+const isRepeat =
+  text.includes("repeat") ||
+  text.includes("again") ||
+  text.includes("didn't understand") ||
+  text.includes("say that again");
 
-    // ✅ Increment count early
-    chatModel.setProperty("/count", count + 1);
+  // 🧠 Allow thinking / avoid premature triggers
+if (!userInput || userInput.trim().length < 4) {
+  this.speakText("Take your time, no hurry.");
+  return;
+}
+
+// ✅ Only count REAL answers
+if (!isRepeat) {
+  count++;
+  chatModel.setProperty("/count", count);
+}
+
+// ✅ Stop interview after limit
+if (count >= 8) {
+  this.speakText("Alright, that gives me a good sense. Let's wrap up.");
+  this.onFinishInterview();
+  return;
+}
 
 
     // ✅ STEP 2: Store user message
@@ -245,6 +281,13 @@ _handleAnswer: async function (userInput) {
     chatModel.setProperty("/messages", messages);
 
 
+       // ✅ STEP 4: Detect "wrap up" intent
+    if (/wrap|finish|end|close/i.test(userInput)) {
+      this.speakText("Sure, let's wrap up the interview.");
+      this.onFinishInterview();
+      return;
+    }
+
     // ✅ STEP 3: Call CAP action
     const oAction = oModel.bindContext("/nextStep(...)");
     oAction.setParameter("userAnswer", userInput);
@@ -255,13 +298,6 @@ _handleAnswer: async function (userInput) {
     const aiReply = oData.value;
 
 
-    // ✅ STEP 4: Detect "wrap up" intent
-    if (/wrap|finish|end|close/i.test(userInput)) {
-      this.speakText("Sure, let's wrap up the interview.");
-      this.onFinishInterview();
-      return;
-    }
-
 
     // ✅ STEP 5: Push AI response
     messages.push({
@@ -271,9 +307,15 @@ _handleAnswer: async function (userInput) {
 
     chatModel.setProperty("/messages", messages);
 
+   // 🧠 Natural HR filler
+const filler = this._getFiller();
+this.speakText(filler);
 
-    // ✅ STEP 6: Speak response
-    this.speakText(aiReply);
+// small pause like human thinking
+await new Promise(resolve => setTimeout(resolve, 1200));
+
+// now actual question
+this.speakText(aiReply);
 
   } catch (e) {
     console.error(e);
