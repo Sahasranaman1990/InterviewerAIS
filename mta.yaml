@@ -1,0 +1,142 @@
+_schema-version: 3.3.0
+ID: InterviewerAIS
+description: A simple CAP project.
+version: 1.0.0
+modules:
+- name: InterviewerAIS-srv
+  type: nodejs
+  path: gen/srv
+  requires:
+  - name: InterviewerAIS-auth
+  - name: InterviewerAIS-db
+  - name: InterviewerAIS-connectivity
+  - name: InterviewerAIS-destination
+  provides:
+  - name: srv-api
+    properties:
+      srv-url: ${default-url}
+  parameters:
+    buildpack: nodejs_buildpack
+    instances: 1
+  build-parameters:
+    builder: npm-ci
+- name: InterviewerAIS-db-deployer
+  type: hdb
+  path: gen/db
+  requires:
+  - name: InterviewerAIS-db
+  parameters:
+    buildpack: nodejs_buildpack
+- name: interviewerais-approuter
+  type: approuter.nodejs
+  path: interviewerais-approuter
+  requires:
+  - name: InterviewerAIS_html_repo_runtime
+  - name: InterviewerAIS-auth
+  - name: InterviewerAIS-destination
+    group: destinations
+    properties:
+      forwardAuthToken: false
+      name: ui5
+      url: https://ui5.sap.com
+  - name: srv-api          # <-- ADD THIS
+    group: destinations
+    properties:
+      forwardAuthToken: true
+      name: srv-api
+      url: ~{srv-url}
+  parameters:
+    disk-quota: 256M
+    memory: 256M
+- name: InterviewerAIS_ui_deployer
+  type: com.sap.application.content
+  path: .
+  requires:
+  - name: InterviewerAIS_html_repo_host
+    parameters:
+      content-target: true
+  build-parameters:
+    build-result: resources
+    requires:
+    - artifacts:
+      - aiinterviewerai.zip
+      name: aiinterviewerai
+      target-path: resources/
+- name: aiinterviewerai
+  type: html5
+  path: app/interviewerai
+  build-parameters:
+    build-result: dist
+    builder: custom
+    commands:
+    - npm install
+    - npm run build:cf
+    supported-platforms: []
+resources:
+- name: InterviewerAIS-auth
+  type: org.cloudfoundry.managed-service
+  parameters:
+    config:
+      oauth2-configuration:
+        credential-types:
+        - binding-secret
+        - x509
+      tenant-mode: dedicated
+      xsappname: InterviewerAIS-${org}-${space}
+    path: ./xs-security.json
+    service: xsuaa
+    service-plan: application
+- name: InterviewerAIS-db
+  type: com.sap.xs.hdi-container
+  parameters:
+    service: hana
+    service-plan: hdi-shared
+- name: InterviewerAIS-connectivity
+  type: org.cloudfoundry.managed-service
+  parameters:
+    service: connectivity
+    service-plan: lite
+- name: InterviewerAIS-destination
+  type: org.cloudfoundry.managed-service
+  requires:            # <-- ADD THIS BLOCK
+  - name: srv-api
+  parameters:
+    config:
+      HTML5Runtime_enabled: false
+      init_data:
+        instance:
+          destinations:
+          - Authentication: NoAuthentication
+            Name: ui5
+            ProxyType: Internet
+            Type: HTTP
+            URL: https://ui5.sap.com
+          - Authentication: NoAuthentication
+            Name: srv-api
+            ProxyType: Internet
+            Type: HTTP
+            URL: ~{srv-api/srv-url}        # <-- references the srv module's output
+            HTML5.DynamicDestination: true  # <-- required for approuter routing
+            forwardAuthToken: true     
+          existing_destinations_policy: update
+    service: destination
+    service-plan: lite
+- name: InterviewerAIS_html_repo_runtime
+  type: org.cloudfoundry.managed-service
+  parameters:
+    service: html5-apps-repo
+    service-plan: app-runtime
+- name: InterviewerAIS_html_repo_host
+  type: org.cloudfoundry.managed-service
+  parameters:
+    service: html5-apps-repo
+    service-plan: app-host
+parameters:
+  deploy_mode: html5-repo
+  enable-parallel-deployments: true
+build-parameters:
+  before-all:
+  - builder: custom
+    commands:
+    - npm ci
+    - npx cds build --production

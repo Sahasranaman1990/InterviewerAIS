@@ -1,0 +1,41 @@
+<mvc:View controllerName="ai.interviewerai.controller.Home"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m">
+    <Page id="page" title="{i18n>title}">
+         <VBox class="sapUiSmallMargin">
+
+    <Title text="AI Interviewer" />
+
+    <Button text="Start Interview" press=".onStartInterview" />
+
+    <List items="{chat>/messages}">
+      <StandardListItem
+        title="{chat>text}"
+        description="{
+          = ${chat>role} === 'ai' 
+          ? 'AI (Score: ' + ${chat>score} + ')' 
+          : 'You'
+        }" />
+    </List>
+
+    <Text text="{
+      = 'Total Score: ' + ${chat>/totalScore} + 
+        ' / ' + (${chat>/count} * 10)
+    }" />
+
+<Button
+  text="Finish Interview"
+  type="Emphasized"
+  press="onFinishInterview"
+/>
+
+<VBox visible="{chat>/showResult}">
+  
+  <Title text="Final Evaluation" level="H2"/>
+
+  <Text text="{chat>/evaluation}" wrapping="true"/>
+
+</VBox>
+  </VBox>
+    </Page>
+</mvc:View>

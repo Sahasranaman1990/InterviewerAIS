@@ -1,0 +1,1 @@
+using InterviewService as service from '../../srv/interview-service';
