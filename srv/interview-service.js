@@ -142,7 +142,8 @@ Provide:
     {
       responseType: "arraybuffer",
       headers: {
-        "xi-api-key": process.env.ELEVEN_API_KEY,
+        // "xi-api-key": process.env.ELEVEN_API_KEY,
+        "xi-api-key":"sk_759976d2069812f370e7892e9576bed5e89c36d587ce6f2e",
         "Content-Type": "application/json"
       }
     }
