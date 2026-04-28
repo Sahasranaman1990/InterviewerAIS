@@ -189,7 +189,7 @@ Provide:
       content: userAnswer
     });
 
-    console.log(process)
+    // console.log(process)
 
     const response = await axios.post(
       "https://adesso-ai-hub.3asabc.de/v1/chat/completions",
@@ -202,7 +202,7 @@ Provide:
       {
         headers: {
           // Authorization: `Bearer ${process.env.AI_API_KEY}`, //  replace
-          Authorization: `Bearer sk-PHU95A0YkUgHqCdSAT2RAg`,
+          Authorization: `Bearer sk-j8QcmazzrvvpFeWiyLgLCw`,
           "Content-Type": "application/json"
         }
       }
@@ -236,7 +236,7 @@ Provide:
       {
         headers: {
            // Authorization: `Bearer ${process.env.AI_API_KEY}`, //  replace
-          Authorization: `Bearer sk-PHU95A0YkUgHqCdSAT2RAg`, // 🔴 replace
+          Authorization: `Bearer sk-j8QcmazzrvvpFeWiyLgLCw`, // 🔴 replace
           "Content-Type": "application/json"
         }
       }
